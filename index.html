@@ -55,7 +55,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:15px;padding:4px 0}
 <main>
   <div class="total">
     <div class="big" id="grand">$0.00</div>
-    <div class="meta" id="meta">0 plates, tax and tip included</div>
+    <div class="meta" id="meta">0 plates, food $0.00</div>
   </div>
 
   <p class="hint">Tap a plate each time you take one. Undo fixes a mis-tap.</p>
@@ -103,6 +103,11 @@ const KEY="sushi-plate-tracker-v1";
 let S;
 try{ S = JSON.parse(localStorage.getItem(KEY)) || null; }catch(e){ S=null; }
 if(!S || !Array.isArray(S.plates)) S = JSON.parse(JSON.stringify(DEFAULT));
+else {
+  // Plate names and colours always come from DEFAULT; only the user's edited prices carry over.
+  const saved = {}; S.plates.forEach(p=>{ if(p && typeof p.price==="number") saved[p.k]=p.price; });
+  S.plates = DEFAULT.plates.map(p=>Object.assign({}, p, p.k in saved ? {price:saved[p.k]} : {}));
+}
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const $ = id => document.getElementById(id);
 const money = n => "$" + (Math.round(n*100)/100).toFixed(2);
@@ -163,7 +168,6 @@ function render(){
   $("sub").textContent=money(sub); $("taxAmt").textContent=money(tax);
   $("tipAmt").textContent=money(tip); $("tot").textContent=money(tot);
   $("grand").textContent=money(tot);
-  const items = n + S.others.length;
   $("meta").textContent = `${n} plate${n===1?"":"s"}${S.others.length?`, ${S.others.length} other`:""}, food ${money(sub)}`;
   save();
 }
