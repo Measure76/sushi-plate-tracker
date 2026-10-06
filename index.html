@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sushi plate tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EEF1F4;--card:#FFFFFF;--ink:#1C2430;--muted:#5D6877;--line:#D5DBE2;--accent:#B5302A;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--card:#1C222B;--ink:#EEF1F4;--muted:#9AA5B3;--line:#2E3642;--accent:#E8665E}}
+:root[data-theme="dark"]{--bg:#12161C;--card:#1C222B;--ink:#EEF1F4;--muted:#9AA5B3;--line:#2E3642;--accent:#E8665E}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:460px;margin:0 auto;padding:20px 18px 32px}
+.total{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:8px 0 14px;z-index:2}
+.big{font-size:clamp(52px,16vw,72px);font-weight:800;letter-spacing:-0.03em;line-height:1}
+.meta{color:var(--muted);font-size:15px;margin-top:6px}
+.plates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:8px 0 18px}
+.plate{position:relative;aspect-ratio:1;border-radius:50%;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font:inherit;color:#fff;transition:transform .08s}
+.plate::after{content:"";position:absolute;inset:14%;border-radius:50%;border:2px solid rgba(255,255,255,.35)}
+.plate:active{transform:scale(.94)}
+.plate:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.plate .p{font-size:20px;font-weight:600}
+.plate .n{font-size:13px;opacity:.85}
+.plate.white{color:#1C2430;box-shadow:inset 0 0 0 1.5px #C9CFD6}
+.plate.white::after{border-color:rgba(0,0,0,.12)}
+.plate.yellow{color:#3A2A00}
+.badge{position:absolute;top:-4px;right:-4px;min-width:28px;height:28px;padding:0 7px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.badge[hidden]{display:none}
+.row{display:flex;gap:10px;margin-bottom:12px}
+button.ctl{flex:1;font:inherit;font-size:16px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.ctl:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.line{display:flex;justify-content:space-between;align-items:center;font-size:16px;padding:5px 0}
+.line span:first-child{color:var(--muted)}
+.line.strong{font-weight:600;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+input[type=number]{width:84px;font:inherit;font-size:16px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);text-align:right}
+.other{display:flex;gap:8px;align-items:center}
+.other input{flex:1;width:auto;text-align:left}
+.list{font-size:15px;color:var(--muted);margin:6px 0 0;padding:0;list-style:none}
+.list li{display:flex;justify-content:space-between;padding:3px 0}
+.list button{background:none;border:none;color:var(--accent);font:inherit;cursor:pointer;padding:0 0 0 10px}
+.hint{color:var(--muted);font-size:14px;margin:0 0 14px}
+details summary{cursor:pointer;color:var(--muted);font-size:15px;padding:4px 0}
+.prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin-top:10px}
+.prices label{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.err{color:var(--accent);font-size:14px;min-height:0;margin:6px 0 0}
+</style>
+</head>
+<body>
+<main>
+  <div class="total">
+    <div class="big" id="grand">$0.00</div>
+    <div class="meta" id="meta">0 plates, tax and tip included</div>
+  </div>
+
+  <p class="hint">Tap a plate each time you take one. Undo fixes a mis-tap.</p>
+  <div class="plates" id="plates"></div>
+
+  <div class="row">
+    <button class="ctl" id="undo">Undo last</button>
+    <button class="ctl" id="reset">New meal</button>
+  </div>
+
+  <div class="panel">
+    <div class="other">
+      <input type="number" id="otherAmt" inputmode="decimal" step="0.01" min="0" placeholder="Off-menu item, e.g. 7.50" aria-label="Off-menu item price">
+      <button class="ctl" id="addOther" style="flex:none;padding:8px 14px">Add</button>
+    </div>
+    <p class="err" id="otherErr"></p>
+    <ul class="list" id="others"></ul>
+  </div>
+
+  <div class="panel">
+    <div class="line"><span>Food subtotal</span><span id="sub">$0.00</span></div>
+    <div class="line"><span>Tax <input type="number" id="tax" step="0.01" min="0" max="20" inputmode="decimal" aria-label="Tax percent"> %</span><span id="taxAmt">$0.00</span></div>
+    <div class="line"><span>Tip <input type="number" id="tip" step="1" min="0" max="50" inputmode="decimal" aria-label="Tip percent"> %</span><span id="tipAmt">$0.00</span></div>
+    <div class="line strong"><span>Total</span><span id="tot">$0.00</span></div>
+  </div>
+
+  <details class="panel">
+    <summary>Edit plate prices</summary>
+    <div class="prices" id="prices"></div>
+  </details>
+</main>
+<script>
+const DEFAULT = {
+  plates:[
+    {k:"blue",name:"Blue",price:3.50,color:"#2F7FD0"},
+    {k:"red",name:"Red",price:4.50,color:"#B23A3A"},
+    {k:"purple",name:"Purple",price:5.25,color:"#7B5BC7"},
+    {k:"green",name:"Green",price:5.75,color:"#2F7D3A"},
+    {k:"yellow",name:"Yellow",price:6.50,color:"#F1BE2E"},
+    {k:"white",name:"White",price:6.95,color:"#FAFAFA"}
+  ],
+  counts:{}, history:[], others:[], tax:10.55, tip:18
+};
+const KEY="sushi-plate-tracker-v1";
+let S;
+try{ S = JSON.parse(localStorage.getItem(KEY)) || null; }catch(e){ S=null; }
+if(!S || !Array.isArray(S.plates)) S = JSON.parse(JSON.stringify(DEFAULT));
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+const $ = id => document.getElementById(id);
+const money = n => "$" + (Math.round(n*100)/100).toFixed(2);
+
+const platesEl=$("plates"), pricesEl=$("prices");
+S.plates.forEach(p=>{
+  const b=document.createElement("button");
+  b.className="plate "+p.k; b.style.background=p.color;
+  b.innerHTML=`<span class="p" id="pp-${p.k}"></span><span class="n">${p.name}</span><span class="badge" id="b-${p.k}" hidden>0</span>`;
+  b.setAttribute("aria-label","Add "+p.name+" plate");
+  b.onclick=()=>{ S.counts[p.k]=(S.counts[p.k]||0)+1; S.history.push({t:"plate",k:p.k}); render(); if(navigator.vibrate) navigator.vibrate(15); };
+  platesEl.appendChild(b);
+  const l=document.createElement("label");
+  l.innerHTML=`${p.name} <input type="number" step="0.05" min="0" inputmode="decimal" value="${p.price.toFixed(2)}">`;
+  l.querySelector("input").oninput=e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)&&v>=0){ p.price=v; render(); } };
+  pricesEl.appendChild(l);
+});
+
+$("tax").value=S.tax; $("tip").value=S.tip;
+$("tax").oninput=e=>{ const v=parseFloat(e.target.value); S.tax=isNaN(v)?0:v; render(); };
+$("tip").oninput=e=>{ const v=parseFloat(e.target.value); S.tip=isNaN(v)?0:v; render(); };
+
+$("addOther").onclick=()=>{
+  const v=parseFloat($("otherAmt").value);
+  if(isNaN(v)||v<=0){ $("otherErr").textContent="Enter a price first."; return; }
+  S.others.push(Math.round(v*100)/100); S.history.push({t:"other"});
+  $("otherAmt").value=""; $("otherErr").textContent=""; render();
+};
+$("otherAmt").oninput=()=>{ $("otherErr").textContent=""; };
+
+$("undo").onclick=()=>{
+  const h=S.history.pop(); if(!h) return;
+  if(h.t==="plate" && S.counts[h.k]>0) S.counts[h.k]--;
+  if(h.t==="other") S.others.pop();
+  render();
+};
+$("reset").onclick=()=>{
+  if(!confirm("Start a new meal? This clears the current count.")) return;
+  S.counts={}; S.history=[]; S.others=[]; render();
+};
+
+function render(){
+  let sub=0, n=0;
+  S.plates.forEach(p=>{
+    const c=S.counts[p.k]||0; sub+=c*p.price; n+=c;
+    $("pp-"+p.k).textContent=money(p.price);
+    const b=$("b-"+p.k); b.textContent=c; b.hidden=c===0;
+  });
+  const ol=$("others"); ol.innerHTML="";
+  S.others.forEach((v,i)=>{
+    sub+=v;
+    const li=document.createElement("li");
+    li.innerHTML=`<span>Off-menu item</span><span>${money(v)}<button aria-label="Remove item">Remove</button></span>`;
+    li.querySelector("button").onclick=()=>{ S.others.splice(i,1); const j=S.history.map(h=>h.t).lastIndexOf("other"); if(j>-1) S.history.splice(j,1); render(); };
+    ol.appendChild(li);
+  });
+  const tax=sub*S.tax/100, tip=sub*S.tip/100, tot=sub+tax+tip;
+  $("sub").textContent=money(sub); $("taxAmt").textContent=money(tax);
+  $("tipAmt").textContent=money(tip); $("tot").textContent=money(tot);
+  $("grand").textContent=money(tot);
+  const items = n + S.others.length;
+  $("meta").textContent = `${n} plate${n===1?"":"s"}${S.others.length?`, ${S.others.length} other`:""}, food ${money(sub)}`;
+  save();
+}
+render();
+</script>
+</body>
+</html>
