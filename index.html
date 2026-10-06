@@ -29,6 +29,13 @@ main{max-width:460px;margin:0 auto;padding:20px 18px 32px}
 .plate.white{color:#1C2430;box-shadow:inset 0 0 0 1.5px #C9CFD6}
 .plate.white::after{border-color:rgba(0,0,0,.12)}
 .plate.yellow{color:#3A2A00}
+.plate.orange{color:#3A1E00}
+.plate.pink{color:#4A1028}
+.plate.gold{color:#3A2A00;background:repeating-linear-gradient(135deg,#D4A72C 0 10px,#E2BA48 10px 20px)!important}
+.plate.black{box-shadow:inset 0 0 0 1.5px #4A505A}
+.plate.clear{color:var(--ink);background:linear-gradient(145deg,rgba(255,255,255,.55),rgba(160,200,230,.25))!important;box-shadow:inset 0 0 0 1.5px var(--line)}
+.plate.clear::after{border-color:var(--line)}
+.plate[hidden]{display:none}
 .badge{position:absolute;top:-4px;right:-4px;min-width:28px;height:28px;padding:0 7px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center}
 .badge[hidden]{display:none}
 .row{display:flex;gap:10px;margin-bottom:12px}
@@ -47,7 +54,12 @@ input[type=number]{width:84px;font:inherit;font-size:16px;padding:6px 8px;border
 .hint{color:var(--muted);font-size:14px;margin:0 0 14px}
 details summary{cursor:pointer;color:var(--muted);font-size:15px;padding:4px 0}
 .prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin-top:10px}
-.prices label{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.prices .pr{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:15px}
+.prices .pr label{display:flex;align-items:center;gap:6px;cursor:pointer;min-width:0}
+.prices input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--accent);flex:none}
+.prices .pr.off label{color:var(--muted)}
+.prices .pr.off input[type=number]{opacity:.5}
+.prices input[type=number]{width:72px}
 .err{color:var(--accent);font-size:14px;min-height:0;margin:6px 0 0}
 </style>
 </head>
@@ -58,7 +70,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:15px;padding:4px 0}
     <div class="meta" id="meta">0 plates, food $0.00</div>
   </div>
 
-  <p class="hint">Tap a plate each time you take one. Undo fixes a mis-tap.</p>
+  <p class="hint">Tap a plate each time you take one. Undo fixes a mis-tap. Turn plate colours on or off under Edit plates.</p>
   <div class="plates" id="plates"></div>
 
   <div class="row">
@@ -83,19 +95,25 @@ details summary{cursor:pointer;color:var(--muted);font-size:15px;padding:4px 0}
   </div>
 
   <details class="panel">
-    <summary>Edit plate prices</summary>
+    <summary>Edit plates</summary>
     <div class="prices" id="prices"></div>
   </details>
 </main>
 <script>
 const DEFAULT = {
   plates:[
-    {k:"blue",name:"Blue",price:3.50,color:"#2F7FD0"},
-    {k:"red",name:"Red",price:4.50,color:"#B23A3A"},
-    {k:"purple",name:"Purple",price:5.25,color:"#7B5BC7"},
-    {k:"green",name:"Green",price:5.75,color:"#2F7D3A"},
-    {k:"yellow",name:"Yellow",price:6.50,color:"#F1BE2E"},
-    {k:"white",name:"White",price:6.95,color:"#FAFAFA"}
+    // Prices on the plates that start off are placeholders — set them under Edit plates.
+    {k:"clear",name:"Clear",price:2.50,color:"transparent",on:false},
+    {k:"blue",name:"Blue",price:3.50,color:"#2F7FD0",on:true},
+    {k:"pink",name:"Pink",price:4.00,color:"#F2A7C3",on:false},
+    {k:"red",name:"Red",price:4.50,color:"#B23A3A",on:true},
+    {k:"orange",name:"Orange",price:5.00,color:"#E8892F",on:false},
+    {k:"purple",name:"Purple",price:5.25,color:"#7B5BC7",on:true},
+    {k:"green",name:"Green",price:5.75,color:"#2F7D3A",on:true},
+    {k:"yellow",name:"Yellow",price:6.50,color:"#F1BE2E",on:true},
+    {k:"white",name:"White",price:6.95,color:"#FAFAFA",on:true},
+    {k:"black",name:"Black",price:7.95,color:"#1E1F24",on:false},
+    {k:"gold",name:"Gold",price:8.95,color:"#D4A72C",on:false}
   ],
   counts:{}, history:[], others:[], tax:10.55, tip:20
 };
@@ -104,9 +122,14 @@ let S;
 try{ S = JSON.parse(localStorage.getItem(KEY)) || null; }catch(e){ S=null; }
 if(!S || !Array.isArray(S.plates)) S = JSON.parse(JSON.stringify(DEFAULT));
 else {
-  // Plate names and colours always come from DEFAULT; only the user's edited prices carry over.
-  const saved = {}; S.plates.forEach(p=>{ if(p && typeof p.price==="number") saved[p.k]=p.price; });
-  S.plates = DEFAULT.plates.map(p=>Object.assign({}, p, p.k in saved ? {price:saved[p.k]} : {}));
+  // Plate names and colours always come from DEFAULT; only the user's edited prices and on/off choices carry over.
+  const saved = {}; S.plates.forEach(p=>{ if(p) saved[p.k]=p; });
+  S.plates = DEFAULT.plates.map(d=>{
+    const p = Object.assign({}, d), o = saved[d.k];
+    if(o && typeof o.price==="number") p.price=o.price;
+    if(o && typeof o.on==="boolean") p.on=o.on;
+    return p;
+  });
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const $ = id => document.getElementById(id);
@@ -115,15 +138,17 @@ const money = n => "$" + (Math.round(n*100)/100).toFixed(2);
 const platesEl=$("plates"), pricesEl=$("prices");
 S.plates.forEach(p=>{
   const b=document.createElement("button");
-  b.className="plate "+p.k; b.style.background=p.color;
+  b.className="plate "+p.k; b.id="pl-"+p.k; b.style.background=p.color;
   b.innerHTML=`<span class="p" id="pp-${p.k}"></span><span class="n">${p.name}</span><span class="badge" id="b-${p.k}" hidden>0</span>`;
   b.setAttribute("aria-label","Add "+p.name+" plate");
   b.onclick=()=>{ S.counts[p.k]=(S.counts[p.k]||0)+1; S.history.push({t:"plate",k:p.k}); render(); if(navigator.vibrate) navigator.vibrate(15); };
   platesEl.appendChild(b);
-  const l=document.createElement("label");
-  l.innerHTML=`${p.name} <input type="number" step="0.05" min="0" inputmode="decimal" value="${p.price.toFixed(2)}">`;
-  l.querySelector("input").oninput=e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)&&v>=0){ p.price=v; render(); } };
-  pricesEl.appendChild(l);
+  const r=document.createElement("div");
+  r.className="pr"; r.id="pr-"+p.k;
+  r.innerHTML=`<label><input type="checkbox"${p.on?" checked":""}> ${p.name}</label><input type="number" step="0.05" min="0" inputmode="decimal" value="${p.price.toFixed(2)}" aria-label="${p.name} plate price">`;
+  r.querySelector("input[type=checkbox]").onchange=e=>{ p.on=e.target.checked; render(); };
+  r.querySelector("input[type=number]").oninput=e=>{ const v=parseFloat(e.target.value); if(!isNaN(v)&&v>=0){ p.price=v; render(); } };
+  pricesEl.appendChild(r);
 });
 
 $("tax").value=S.tax; $("tip").value=S.tip;
@@ -155,6 +180,9 @@ function render(){
     const c=S.counts[p.k]||0; sub+=c*p.price; n+=c;
     $("pp-"+p.k).textContent=money(p.price);
     const b=$("b-"+p.k); b.textContent=c; b.hidden=c===0;
+    // A plate turned off mid-meal stays visible until its count is cleared, so it can't vanish from the bill unseen.
+    $("pl-"+p.k).hidden = !p.on && c===0;
+    $("pr-"+p.k).classList.toggle("off", !p.on);
   });
   const ol=$("others"); ol.innerHTML="";
   S.others.forEach((v,i)=>{
